@@ -1,0 +1,6 @@
+{
+  "name": "ARIA",
+  "description": "A high-performance AI workspace combining project-based context and versatile chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["AI Chat", "Project Management", "Contextual Document Retrieval"]
+}
