@@ -1,7 +1,8 @@
+import { ChunkHoverCard } from './hover-card';
 import React from 'react'
 import { FileText, Lightbulb, FileEdit } from 'lucide-react'
 
-export type ReferenceType = 'source' | 'note' | 'source_insight'
+export type ReferenceType = 'source' | 'note' | 'source_insight' | 'chunk'
 
 export interface ParsedReference {
   type: ReferenceType
@@ -46,7 +47,7 @@ export interface ReferenceData {
 export function parseSourceReferences(text: string): ParsedReference[] {
   // Match pattern: (source_insight|note|source):alphanumeric_id
   // This handles references both inside and outside brackets
-  const pattern = /(source_insight|note|source):([a-zA-Z0-9_]+)/g
+  const pattern = /(source_insight|note|source|chunk):([a-zA-Z0-9_]+)/g
   const matches: ParsedReference[] = []
 
   let match
@@ -445,6 +446,24 @@ export function createCompactReferenceLinkComponent(
       const parts = href.substring(5).split('-') // Remove '#ref-'
       const type = parts[0] as ReferenceType
       const id = parts.slice(1).join('-') // Rejoin in case ID has dashes
+
+if (type === 'chunk') {
+        return (
+          <ChunkHoverCard chunkId={id}>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onReferenceClick(type, id)
+              }}
+              className="text-primary hover:underline cursor-pointer inline font-medium bg-gray-800 rounded px-1"
+              type="button"
+            >
+              {children}
+            </button>
+          </ChunkHoverCard>
+        )
+      }
 
       return (
         <button

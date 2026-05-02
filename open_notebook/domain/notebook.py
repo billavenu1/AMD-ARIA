@@ -235,8 +235,18 @@ class Asset(BaseModel):
     url: Optional[str] = None
 
 
+
+class SourceChunk(ObjectModel):
+    table_name: ClassVar[str] = "source_chunk"
+    source_id: str
+    chunk_index: int
+    text_content: str
+    page_number: int
+    image_paths: List[str] = Field(default_factory=list)
+
 class SourceEmbedding(ObjectModel):
     table_name: ClassVar[str] = "source_embedding"
+    chunk_id: str
     content: str
 
     async def get_source(self) -> "Source":
@@ -363,11 +373,29 @@ class Source(ObjectModel):
     ) -> Dict[str, Any]:
         insights_list = await self.get_insights()
         insights = [insight.model_dump() for insight in insights_list]
+
+        # Fetch chunks instead of using full_text
+        chunks = []
+        if context_size == "long":
+            try:
+                # Query chunks for this source
+                from open_notebook.database.repository import repo_query
+                chunk_results = await repo_query(
+                    "SELECT id, chunk_index, text_content FROM source_chunk WHERE source_id = $id ORDER BY chunk_index ASC",
+                    {"id": self.id}
+                )
+                if chunk_results:
+                    chunks = chunk_results
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to get chunks for {self.id}: {e}")
+
         if context_size == "long":
             return dict(
                 id=self.id,
                 title=self.title,
                 insights=insights,
+                chunks=chunks,
                 full_text=self.full_text,
             )
         else:

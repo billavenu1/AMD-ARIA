@@ -32,16 +32,16 @@ When a user asks you a question, analyze both the source content and the availab
 When referencing information from the source or its insights, always include citations using the document IDs. This helps users track the specific content you're referencing.
 
 ## Citation Format
-- For source content: [{{ source.id if source else "source:id" }}]
+- For source content chunks: [chunk:chunk_id] (use the exact chunk ID)
 - For insights: [insight_id] (use the specific insight ID)
 
 ## EXAMPLE
 
 User: What are the main themes in this document?
-Assistant: Based on the source content, I can identify several key themes [source:specific_id]:
+Assistant: Based on the source content, I can identify several key themes [chunk:specific_chunk_id]:
 
 1. **Theme 1**: The document discusses X, which appears in several insights [insight:specific_insight_id]
-2. **Theme 2**: Another important concept is Y, as shown in [source:specific_id]
+2. **Theme 2**: Another important concept is Y, as shown in [chunk:specific_chunk_id]
 
 Each theme is supported by specific insights and passages from the source material.
 
