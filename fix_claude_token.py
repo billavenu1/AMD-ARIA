@@ -7,14 +7,21 @@ for filepath in glob.glob(".github/workflows/*.yml"):
         content = f.read()
 
     # Need to make sure both tokens are handled correctly
-    if "anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}" in content:
-        content = content.replace("anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
-                                  "anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}")
+    if "anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}" in content:
+        # Add claude_code_oauth_token manually if it was deleted
+        if "claude_code_oauth_token" not in content:
+            content = content.replace("anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}",
+                                      "anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}\n          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}")
 
-    # We must provide anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }} AND claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-    # But since the previous CI run complained that BOTH were missing or invalid (because empty string)
-    # The action might fail if we pass an empty string for the API key and expect it to fallback.
-    # The correct way is probably to use only the one that is present, or pass them both as they are.
+        # Check if the secret is passed via env, which might be required by the action itself.
+        # Actually the error says "Environment variable validation failed: Either ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN is required"
+        # It seems the ACTION itself requires it passed through env maybe?
+        # But wait, looking at the inputs to the action: `anthropic_api_key: ""`
+        # This implies `secrets.ANTHROPIC_API_KEY` is literally empty.
+
+        # If it's empty, we must find a way to let it know not to fail or provide a dummy one if it is missing
+        # BUT this is a third-party Github action, if the user doesn't have the secret, it fails.
+        # So we should only run the job if the secret is available!
 
     with open(filepath, "w") as f:
         f.write(content)
