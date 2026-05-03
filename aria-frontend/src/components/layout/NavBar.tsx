@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
+  Workflow,
   MessageSquare, 
   Rocket, 
   BrainCircuit, 
@@ -26,6 +27,7 @@ export const NavBar: React.FC<NavBarProps> = ({
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'elyra', label: 'Elyra', icon: Workflow },
     { id: 'chat', label: 'Chat', icon: MessageSquare },
     { id: 'deploy', label: 'Deploy Agents', icon: Rocket },
     { id: 'models', label: 'Models', icon: BrainCircuit },

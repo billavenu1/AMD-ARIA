@@ -468,13 +468,17 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         # Find existing embeddings to delete first based on the old schema it was `source`, now it's `chunk_id`
         # wait we already changed `source` to `chunk_id` in SourceEmbedding
 
+        from open_notebook.database.repository import ensure_record_id
+        
         records = [
             {
                 "chunk_id": str(chunk.id),
+                "source": ensure_record_id(chunk.source_id),
                 "content": chunk.text_content,
                 "embedding": embedding,
+                "order": idx
             }
-            for chunk, embedding in zip(saved_chunks, embeddings)
+            for idx, (chunk, embedding) in enumerate(zip(saved_chunks, embeddings))
         ]
 
         logger.debug(f"Inserting {len(records)} source_embedding records")

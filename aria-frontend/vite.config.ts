@@ -24,6 +24,16 @@ export default defineConfig(({mode}) => {
           target: 'http://localhost:5055',
           changeOrigin: true,
         },
+        '/elyra': {
+          target: 'http://localhost:8888',
+          changeOrigin: true,
+          ws: true,
+        },
+        '/api/kernels': {
+          target: 'http://localhost:8888',
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
   };

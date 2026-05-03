@@ -1,10 +1,10 @@
-Write-Host "[*] Starting Open Notebook (Database + API + Worker + Frontend)..." -ForegroundColor Cyan
+Write-Host "[*] Starting Open Notebook (Database + Elyra + API + Worker + Frontend)..." -ForegroundColor Cyan
 
-# Step 1: Start SurrealDB
-Write-Host "[1/4] Starting SurrealDB..." -ForegroundColor Yellow
-docker compose -f docker-compose.dev.yml up -d surrealdb
+# Step 1: Start Docker services
+Write-Host "[1/4] Starting SurrealDB and Elyra..." -ForegroundColor Yellow
+docker compose -f docker-compose.dev.yml up -d surrealdb elyra
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ERROR] Failed to start SurrealDB. Is Docker Desktop running?" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to start Docker services. Is Docker Desktop running?" -ForegroundColor Red
     exit 1
 }
 Start-Sleep -Seconds 3
@@ -40,6 +40,7 @@ Write-Host "[OK] All services started!" -ForegroundColor Green
 Write-Host "     Frontend: http://localhost:3000" -ForegroundColor Cyan
 Write-Host "     API:      http://localhost:5055" -ForegroundColor Cyan
 Write-Host "     API Docs: http://localhost:5055/docs" -ForegroundColor Cyan
+Write-Host "     Elyra:    http://localhost:8888/elyra/lab" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[4/4] Starting Next.js frontend (press Ctrl+C to stop)..." -ForegroundColor Yellow
 Write-Host ""

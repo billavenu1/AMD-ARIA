@@ -295,15 +295,30 @@ async def get_default_models():
     """Get default model assignments."""
     try:
         defaults = await DefaultModels.get_instance()
+        
+        # Helper to resolve env var model name to ID
+        async def resolve_env_model(env_name: str, db_value: Optional[str]) -> Optional[str]:
+            val = os.getenv(env_name)
+            if not val:
+                return db_value
+            if val.startswith("model:"):
+                return val
+            # Resolve name to ID
+            from open_notebook.database.repository import repo_query
+            models = await repo_query(
+                "SELECT id FROM model WHERE string::lowercase(name) = $name LIMIT 1",
+                {"name": val.lower()}
+            )
+            return models[0]["id"] if models else db_value
 
         return DefaultModelsResponse(
-            default_chat_model=defaults.default_chat_model,  # type: ignore[attr-defined]
-            default_transformation_model=defaults.default_transformation_model,  # type: ignore[attr-defined]
-            large_context_model=defaults.large_context_model,  # type: ignore[attr-defined]
-            default_text_to_speech_model=defaults.default_text_to_speech_model,  # type: ignore[attr-defined]
-            default_speech_to_text_model=defaults.default_speech_to_text_model,  # type: ignore[attr-defined]
-            default_embedding_model=defaults.default_embedding_model,  # type: ignore[attr-defined]
-            default_tools_model=defaults.default_tools_model,  # type: ignore[attr-defined]
+            default_chat_model=await resolve_env_model("DEFAULT_CHAT_MODEL", defaults.default_chat_model),  # type: ignore[attr-defined]
+            default_transformation_model=await resolve_env_model("DEFAULT_TRANSFORMATION_MODEL", defaults.default_transformation_model or defaults.default_chat_model),  # type: ignore[attr-defined]
+            large_context_model=await resolve_env_model("LARGE_CONTEXT_MODEL", defaults.large_context_model),  # type: ignore[attr-defined]
+            default_text_to_speech_model=await resolve_env_model("DEFAULT_TTS_MODEL", defaults.default_text_to_speech_model),  # type: ignore[attr-defined]
+            default_speech_to_text_model=await resolve_env_model("DEFAULT_STT_MODEL", defaults.default_speech_to_text_model),  # type: ignore[attr-defined]
+            default_embedding_model=await resolve_env_model("DEFAULT_EMBEDDING_MODEL", defaults.default_embedding_model),  # type: ignore[attr-defined]
+            default_tools_model=await resolve_env_model("DEFAULT_TOOLS_MODEL", defaults.default_tools_model or defaults.default_chat_model),  # type: ignore[attr-defined]
         )
     except Exception as e:
         logger.error(f"Error fetching default models: {str(e)}")

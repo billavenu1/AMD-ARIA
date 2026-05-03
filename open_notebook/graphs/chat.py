@@ -27,9 +27,58 @@ class ThreadState(TypedDict):
     model_override: Optional[str]
 
 
+def _format_chat_context(context_data: dict) -> str:
+    """Format the context dictionary into a string with chunks."""
+    if not isinstance(context_data, dict):
+        return str(context_data)
+        
+    context_parts = []
+    
+    if context_data.get("sources"):
+        context_parts.append("## SOURCES")
+        for source in context_data["sources"]:
+            context_parts.append(f"**Source ID:** {source.get('id', 'Unknown')}")
+            context_parts.append(f"**Title:** {source.get('title', 'No title')}")
+            
+            if source.get("chunks"):
+                context_parts.append("**Chunks:**")
+                for chunk in source["chunks"]:
+                    chunk_id = chunk.get("id", "").replace("source_chunk:", "") if chunk.get("id") else ""
+                    context_parts.append(f"[chunk:{chunk_id}]")
+                    context_parts.append(f"{chunk.get('text_content', '')}")
+                    context_parts.append("")
+            elif source.get("full_text"):
+                full_text = source["full_text"]
+                if len(full_text) > 100000:
+                    full_text = full_text[:100000] + "...\n[Content truncated]"
+                context_parts.append(f"**Content:**\n{full_text}")
+            
+            # Add insights if present
+            if source.get("insights"):
+                context_parts.append("**Insights:**")
+                for insight in source["insights"]:
+                    context_parts.append(f"[insight:{insight.get('id', '').replace('source_insight:', '')}] {insight.get('content', '')}")
+            
+            context_parts.append("")
+            
+    if context_data.get("notes"):
+        context_parts.append("## NOTES")
+        for note in context_data["notes"]:
+            context_parts.append(f"**Note ID:** {note.get('id', 'Unknown')}")
+            context_parts.append(f"**Title:** {note.get('title', 'No title')}")
+            context_parts.append(f"**Content:**\n{note.get('content', '')}")
+            context_parts.append("")
+            
+    return "\n".join(context_parts)
+
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
     try:
-        system_prompt = Prompter(prompt_template="chat/system").render(data=state)  # type: ignore[arg-type]
+        # Format context if it's a dict
+        formatted_state = dict(state)
+        if formatted_state.get("context") and isinstance(formatted_state["context"], dict):
+            formatted_state["context"] = _format_chat_context(formatted_state["context"])
+            
+        system_prompt = Prompter(prompt_template="chat/system").render(data=formatted_state)  # type: ignore[arg-type]
         payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
         model_id = config.get("configurable", {}).get("model_id") or state.get(
             "model_override"

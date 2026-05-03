@@ -273,12 +273,22 @@ async def discover_google_models() -> List[DiscoveredModel]:
         # Log without exposing the API key in the message
         logger.warning(f"Failed to discover Google models: {type(e).__name__}")
 
-    # Manually append the requested preview models since they might not be fully discoverable
+    # Manually append requested models from environment variable
+    extra_models_env = os.environ.get("EXTRA_MODELS", "")
     preview_models = [
+        m.strip() for m in extra_models_env.split(",") if m.strip()
+    ]
+    
+    # Add default preview models if not already in the list
+    default_previews = [
         "gemini-3-flash-preview",
         "gemini-3.1-flash-lite-preview",
         "gemini-3.1-pro-preview"
     ]
+    for dp in default_previews:
+        if dp not in preview_models:
+            preview_models.append(dp)
+
     for pm in preview_models:
         # Avoid adding duplicates if the API eventually returns them
         if not any(m.name == pm for m in models):
@@ -287,7 +297,7 @@ async def discover_google_models() -> List[DiscoveredModel]:
                     name=pm,
                     provider="google",
                     model_type="language",
-                    description=f"{pm} (Preview)"
+                    description=f"{pm} (Preview/Manual)"
                 )
             )
 

@@ -214,7 +214,7 @@ async def get_sources(
         else:
             # Query all sources - include command field with FETCH
             query = f"""
-                SELECT id, asset, created, title, updated, topics, command,
+                SELECT id, asset, created, title, updated, topics, command, full_text,
                 (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
                 (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
                 FROM source
@@ -1065,20 +1065,23 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
 async def get_chunk(chunk_id: str):
     """Get details for a specific chunk including extracted images."""
     try:
-        from open_notebook.database.repository import repo_query
+        from open_notebook.domain.notebook import Source, SourceChunk
 
         # Ensure correct table prefix
         full_chunk_id = f"source_chunk:{chunk_id}" if not chunk_id.startswith("source_chunk:") else chunk_id
 
-        chunk = await repo_query(
-            "SELECT * FROM $id",
-            {"id": full_chunk_id}
-        )
+        chunk = await SourceChunk.get(full_chunk_id)
 
         if not chunk:
             raise HTTPException(status_code=404, detail="Chunk not found")
+            
+        chunk_data = chunk.model_dump()
+        if "source_id" in chunk_data and chunk_data["source_id"]:
+            source = await Source.get(chunk_data["source_id"])
+            if source:
+                chunk_data["source_title"] = source.title
 
-        return chunk[0]
+        return chunk_data
     except HTTPException:
         raise
     except Exception as e:

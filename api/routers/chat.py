@@ -20,7 +20,7 @@ router = APIRouter()
 
 # Request/Response models
 class CreateSessionRequest(BaseModel):
-    notebook_id: str = Field(..., description="Notebook ID to create session for")
+    notebook_id: Optional[str] = Field(None, description="Notebook ID to create session for")
     title: Optional[str] = Field(None, description="Optional session title")
     model_override: Optional[str] = Field(
         None, description="Optional model override for this session"
@@ -94,20 +94,34 @@ class SuccessResponse(BaseModel):
 
 
 @router.get("/chat/sessions", response_model=List[ChatSessionResponse])
-async def get_sessions(notebook_id: str = Query(..., description="Notebook ID")):
+async def get_sessions(notebook_id: Optional[str] = Query(None, description="Notebook ID")):
     """Get all chat sessions for a notebook."""
     try:
-        # Get notebook to verify it exists
-        notebook = await Notebook.get(notebook_id)
-        if not notebook:
-            raise HTTPException(status_code=404, detail="Notebook not found")
-
-        # Get sessions for this notebook
-        sessions_list = await notebook.get_chat_sessions()
+        notebook_lookup: Dict[str, Optional[str]] = {}
+        if notebook_id:
+            # Get notebook to verify it exists
+            notebook = await Notebook.get(notebook_id)
+            if not notebook:
+                raise NotFoundError(f"Notebook {notebook_id} not found")
+            sessions = await notebook.get_chat_sessions()
+        else:
+            # Get all sessions globally
+            res = await repo_query("SELECT * FROM chat_session ORDER BY updated DESC LIMIT 50")
+            sessions = [ChatSession(**row) for row in res]
+            if sessions:
+                session_ids = [ensure_record_id(str(session.id)) for session in sessions if session.id]
+                relation_rows = await repo_query(
+                    "SELECT in, out FROM refers_to WHERE in IN $session_ids",
+                    {"session_ids": session_ids},
+                )
+                notebook_lookup = {
+                    str(row["in"]): str(row["out"]) for row in relation_rows if row.get("out")
+                }
 
         results = []
-        for session in sessions_list:
+        for session in sessions:
             session_id = str(session.id)
+            session_notebook_id = notebook_id or notebook_lookup.get(session_id)
 
             # Get message count from LangGraph state
             msg_count = await get_session_message_count(chat_graph, session_id)
@@ -116,7 +130,7 @@ async def get_sessions(notebook_id: str = Query(..., description="Notebook ID"))
                 ChatSessionResponse(
                     id=session.id or "",
                     title=session.title or "Untitled Session",
-                    notebook_id=notebook_id,
+                    notebook_id=session_notebook_id,
                     created=str(session.created),
                     updated=str(session.updated),
                     message_count=msg_count,
@@ -138,10 +152,11 @@ async def get_sessions(notebook_id: str = Query(..., description="Notebook ID"))
 async def create_session(request: CreateSessionRequest):
     """Create a new chat session."""
     try:
-        # Verify notebook exists
-        notebook = await Notebook.get(request.notebook_id)
-        if not notebook:
-            raise HTTPException(status_code=404, detail="Notebook not found")
+        if request.notebook_id:
+            # Verify notebook exists when creating a project-bound chat.
+            notebook = await Notebook.get(request.notebook_id)
+            if not notebook:
+                raise HTTPException(status_code=404, detail="Notebook not found")
 
         # Create new session
         session = ChatSession(
@@ -151,8 +166,8 @@ async def create_session(request: CreateSessionRequest):
         )
         await session.save()
 
-        # Relate session to notebook
-        await session.relate_to_notebook(request.notebook_id)
+        if request.notebook_id:
+            await session.relate_to_notebook(request.notebook_id)
 
         return ChatSessionResponse(
             id=session.id or "",
@@ -356,10 +371,37 @@ async def execute_chat(request: ExecuteChatRequest):
             config=RunnableConfig(configurable={"thread_id": full_session_id}),
         )
 
+        # Get notebook_id from session
+        notebook_query = await repo_query(
+            "SELECT out FROM refers_to WHERE in = $session_id",
+            {"session_id": ensure_record_id(full_session_id)},
+        )
+        notebook_id = notebook_query[0]["out"] if notebook_query else None
+
+        # Build actual context data from the configuration
+        from open_notebook.utils.context_builder import ContextBuilder, ContextConfig
+        if notebook_id:
+            context_config_obj = ContextConfig(
+                sources=request.context.get("sources", {}),
+                notes=request.context.get("notes", {})
+            )
+            # Default to full content for sources if not specified
+            if not context_config_obj.sources:
+                from open_notebook.domain.notebook import Notebook
+                notebook = await Notebook.get(notebook_id)
+                if notebook:
+                    sources = await notebook.get_sources()
+                    context_config_obj.sources = {str(src.id): "full content" for src in sources if src.id}
+                
+            builder = ContextBuilder(notebook_id=notebook_id, context_config=context_config_obj)
+            resolved_context = await builder.build()
+        else:
+            resolved_context = request.context
+
         # Prepare state for execution
         state_values = current_state.values if current_state else {}
         state_values["messages"] = state_values.get("messages", [])
-        state_values["context"] = request.context
+        state_values["context"] = resolved_context
         state_values["model_override"] = model_override
 
         # Add user message to state
