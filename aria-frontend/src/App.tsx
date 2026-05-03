@@ -3,6 +3,7 @@ import { NavBar } from './components/layout/NavBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { RightPanel } from './components/layout/RightPanel';
 import { ChatView } from './components/chat/ChatView';
+import { GenUIChatView } from './components/chat/GenUIChatView';
 import { DeployAgentsView } from './components/deploy/DeployAgentsView';
 import { ElyraView } from './components/elyra/ElyraView';
 import { View } from './types';
@@ -45,16 +46,20 @@ export default function App() {
           />
 
           {/* CENTER - CHAT CANVAS (includes its own header) */}
-          <ChatView 
-            isSidebarCollapsed={isSidebarCollapsed}
-            setIsSidebarCollapsed={setIsSidebarCollapsed}
-            activeProjectId={activeProjectId}
-            activeChatId={activeChatId}
-            setActiveChatId={setActiveChatId}
-            selectedDocIds={selectedDocIds}
-            isRightPanelOpen={isRightPanelOpen}
-            setIsRightPanelOpen={setIsRightPanelOpen}
-          />
+          {activeProjectId ? (
+            <ChatView
+              isSidebarCollapsed={isSidebarCollapsed}
+              setIsSidebarCollapsed={setIsSidebarCollapsed}
+              activeProjectId={activeProjectId}
+              activeChatId={activeChatId}
+              setActiveChatId={setActiveChatId}
+              selectedDocIds={selectedDocIds}
+              isRightPanelOpen={isRightPanelOpen}
+              setIsRightPanelOpen={setIsRightPanelOpen}
+            />
+          ) : (
+            <GenUIChatView activeChatId={activeChatId} />
+          )}
 
           {/* RIGHT PANEL - only when a project is active */}
           {activeProjectId && (

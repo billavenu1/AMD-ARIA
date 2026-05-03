@@ -22,6 +22,7 @@ open_notebook/domain/__init__.py
 open_notebook/domain/base.py
 open_notebook/domain/content_settings.py
 open_notebook/domain/credential.py
+open_notebook/domain/genui.py
 open_notebook/domain/notebook.py
 open_notebook/domain/provider_config.py
 open_notebook/domain/transformation.py
@@ -49,6 +50,7 @@ tests/test_chunking.py
 tests/test_credentials_api.py
 tests/test_domain.py
 tests/test_embedding.py
+tests/test_genui_chat.py
 tests/test_graphs.py
 tests/test_models_api.py
 tests/test_notes_api.py

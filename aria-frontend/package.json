@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@openuidev/react-headless": "^0.8.1",
+    "@openuidev/react-lang": "^0.2.4",
+    "@openuidev/react-ui": "^0.11.4",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/react-query": "^5.83.0",
     "@vitejs/plugin-react": "^5.0.4",
