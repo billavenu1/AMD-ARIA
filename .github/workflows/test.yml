@@ -38,6 +38,13 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v
 
+      - name: Verify GenUI Integration
+        run: |
+          echo "Verifying GenUI router registration..."
+          grep -q "genui_chat" api/main.py
+          echo "Verifying GenUI domain models..."
+          ls open_notebook/domain/genui.py
+
   frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
