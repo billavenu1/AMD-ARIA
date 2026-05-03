@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useNotebooks, useCreateNotebook, useDeleteNotebook, useUpdateNotebook } from '../../hooks/useNotebooks';
 import { useChatSessions, useCreateSession, useUpdateSession, useDeleteSession } from '../../hooks/useChat';
+import { useGenUISessions, useCreateGenUISession, useDeleteGenUISession } from '../../hooks/useGenUIChat';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import type { ChatSession } from '../../types';
 
@@ -37,12 +38,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { data: projects = [] } = useNotebooks();
   const { data: allSessions = [] } = useChatSessions(null);
+  const { data: genUISessions = [] } = useGenUISessions();
   const createNotebookMutation = useCreateNotebook();
   const deleteNotebookMutation = useDeleteNotebook();
   const updateNotebookMutation = useUpdateNotebook();
   const updateSessionMutation = useUpdateSession();
   const deleteSessionMutation = useDeleteSession();
   const createSessionMutation = useCreateSession();
+  const createGenUISessionMutation = useCreateGenUISession();
+  const deleteGenUISessionMutation = useDeleteGenUISession();
   
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const [isChatsExpanded, setIsChatsExpanded] = useState(true);
@@ -65,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleNewChat = () => {
     setActiveProjectId(null);
-    createSessionMutation.mutate({ notebookId: null }, {
+    createGenUISessionMutation.mutate(undefined, {
       onSuccess: (session) => setActiveChatId(session.id),
     });
   };
@@ -101,10 +105,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenChatMenuId(null);
   };
 
-  const independentChats = allSessions.filter((chat) => !chat.notebook_id);
+  const independentChats = genUISessions;
   const projectChats = (projectId: string) => allSessions.filter((chat) => chat.notebook_id === projectId);
 
-  const renderChatRow = (chat: ChatSession, projectId: string | null) => (
+  const renderChatRow = (chat: any, projectId: string | null) => (
     <div key={chat.id} className="relative group">
       <div
         className={`flex items-center gap-1 rounded-lg transition-all ${
@@ -346,7 +350,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         confirmLabel="Delete"
         onConfirm={() => {
           if (deletingChatId) {
-            deleteSessionMutation.mutate({ sessionId: deletingChatId });
+            // Check if it is a GenUI session
+            if (deletingChatId.startsWith('genui_session:')) {
+              deleteGenUISessionMutation.mutate(deletingChatId);
+            } else {
+              deleteSessionMutation.mutate({ sessionId: deletingChatId });
+            }
             if (activeChatId === deletingChatId) setActiveChatId(null);
           }
           setDeletingChatId(null);
