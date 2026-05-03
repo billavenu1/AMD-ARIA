@@ -206,12 +206,22 @@ def _format_source_context(context_data: Dict) -> str:
             if isinstance(source, dict):
                 context_parts.append(f"**Source ID:** {source.get('id', 'Unknown')}")
                 context_parts.append(f"**Title:** {source.get('title', 'No title')}")
-                if source.get("full_text"):
+
+                # Check for chunks first
+                if source.get("chunks"):
+                    context_parts.append("**Chunks:**")
+                    for chunk in source["chunks"]:
+                        context_parts.append(f"[chunk:{chunk.get('id')}]")
+                        context_parts.append(f"{chunk.get('text_content', '')}")
+                        context_parts.append("")
+                elif source.get("full_text"):
                     # Truncate full text if too long (150,000 chars is ~35,000 tokens)
                     full_text = source["full_text"]
                     if len(full_text) > 150000:
                         full_text = full_text[:150000] + "...\n[Content truncated]"
+
                     context_parts.append(f"**Content:**\n{full_text}")
+
                 context_parts.append("")  # Empty line for separation
 
     # Add insights

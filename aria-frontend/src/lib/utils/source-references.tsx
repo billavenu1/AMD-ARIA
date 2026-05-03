@@ -1,7 +1,8 @@
+import { ChunkHoverCard } from './hover-card';
 import React from 'react'
 import { FileText, Lightbulb, FileEdit } from 'lucide-react'
 
-export type ReferenceType = 'source' | 'note' | 'source_insight'
+export type ReferenceType = 'source' | 'note' | 'source_insight' | 'chunk'
 
 export interface ParsedReference {
   type: ReferenceType
@@ -46,7 +47,7 @@ export interface ReferenceData {
 export function parseSourceReferences(text: string): ParsedReference[] {
   // Match pattern: (source_insight|note|source):alphanumeric_id
   // This handles references both inside and outside brackets
-  const pattern = /(source_insight|note|source):([a-zA-Z0-9_]+)/g
+  const pattern = /(source_insight|note|source|chunk):([a-zA-Z0-9_]+)/g
   const matches: ParsedReference[] = []
 
   let match
@@ -182,7 +183,7 @@ export function convertReferencesToMarkdownLinks(text: string): string {
     const id = match[2]
 
     // Validate the reference
-    const validTypes = ['source', 'source_insight', 'note']
+    const validTypes = ['source', 'source_insight', 'note', 'chunk']
     if (!validTypes.includes(type) || !id || id.length === 0 || id.length > 100) {
       continue // Skip invalid references
     }
@@ -388,6 +389,11 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
       replaceStart = refStart - 1
       replaceEnd = refEnd + 1
     }
+    // Check for escaped brackets \[ref\]
+    else if (contextBefore.endsWith('\\[') && contextAfter.startsWith('\\]')) {
+      replaceStart = refStart - 2
+      replaceEnd = refEnd + 2
+    }
 
     // Build the numbered citation with full reference in href
     const citationLink = `[${number}](#ref-${reference.type}-${reference.id})`
@@ -396,18 +402,8 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
     result = result.substring(0, replaceStart) + citationLink + result.substring(replaceEnd)
   }
 
-  // Step 5: Build reference list
-  const refListLines: string[] = [`\n\n${referencesLabel}:`]
-
-  // Iterate through reference map in insertion order (Map preserves order)
-  for (const [, refData] of referenceMap) {
-    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}](#ref-${refData.type}-${refData.id})`
-    refListLines.push(refListItem)
-  }
-
-  // Step 6: Append reference list to result
-  result = result + refListLines.join('\n')
-
+  // Removed reference list appending as requested
+  
   return result
 }
 
@@ -446,18 +442,38 @@ export function createCompactReferenceLinkComponent(
       const type = parts[0] as ReferenceType
       const id = parts.slice(1).join('-') // Rejoin in case ID has dashes
 
-      return (
+      const buttonEl = (
         <button
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
             onReferenceClick(type, id)
           }}
-          className="text-primary hover:underline cursor-pointer inline font-medium"
+          className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 ml-1 text-[10px] font-bold bg-[#303030] hover:bg-[#454545] text-gray-300 rounded-full transition-colors cursor-pointer select-none no-underline border border-[#404040]"
           type="button"
         >
           {children}
         </button>
+      )
+
+      if (type === 'chunk') {
+        return (
+          <ChunkHoverCard chunkId={id}>
+            {buttonEl}
+          </ChunkHoverCard>
+        )
+      }
+
+      // Placeholder generic hover card for sources, notes, insights
+      return (
+        <div className="relative inline-block group">
+          {buttonEl}
+          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 z-50 w-max max-w-[250px] p-2 bg-[#222] text-xs text-gray-300 rounded shadow-lg border border-[#444] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span className="font-semibold text-white capitalize">{type} Reference</span>
+            <br />
+            <span className="text-gray-500 truncate block max-w-[200px]">{id}</span>
+          </div>
+        </div>
       )
     }
 

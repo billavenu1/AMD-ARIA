@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -285,6 +286,8 @@ async def open_notebook_error_handler(request: Request, exc: OpenNotebookError):
         headers=_cors_headers(request),
     )
 
+
+app.mount("/assets", StaticFiles(directory="surreal_data/assets"), name="assets")
 
 # Include routers
 app.include_router(auth.router, prefix="/api", tags=["auth"])

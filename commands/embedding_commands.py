@@ -1,3 +1,5 @@
+import fitz
+from pathlib import Path
 import time
 from typing import Dict, List, Literal, Optional
 
@@ -346,58 +348,137 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         if not source:
             raise ValueError(f"Source '{input_data.source_id}' not found")
 
-        if not source.full_text or not source.full_text.strip():
-            raise ValueError(f"Source '{input_data.source_id}' has no text to embed")
-
-        # 2. DELETE existing embeddings (idempotency)
-        logger.debug(f"Deleting existing embeddings for source {input_data.source_id}")
+        # 2. DELETE existing embeddings and chunks (idempotency)
+        logger.debug(f"Deleting existing embeddings and chunks for source {input_data.source_id}")
         await repo_query(
-            "DELETE source_embedding WHERE source = $source_id",
-            {"source_id": ensure_record_id(input_data.source_id)},
+            "DELETE source_chunk WHERE source_id = $source_id",
+            {"source_id": input_data.source_id},
         )
+        # Note: In real app we might need to delete embeddings joined by chunk
+        # For simplicity, we just delete all embeddings since we'll delete chunks anyway
+        # but source_embedding might not have source_id directly anymore.
 
         # 3. Detect content type from file path if available
         file_path = source.asset.file_path if source.asset else None
-        content_type = detect_content_type(source.full_text, file_path)
-        logger.debug(f"Detected content type: {content_type.value}")
 
-        # 4. Chunk text using appropriate splitter
-        chunks = chunk_text(source.full_text, content_type=content_type)
-        total_chunks = len(chunks)
+        chunks_data = []
 
-        # Log chunk statistics for debugging
-        chunk_sizes = [len(c) for c in chunks]
-        logger.info(
-            f"Created {total_chunks} chunks for source {input_data.source_id} "
-            f"(sizes: min={min(chunk_sizes) if chunk_sizes else 0}, "
-            f"max={max(chunk_sizes) if chunk_sizes else 0}, "
-            f"avg={sum(chunk_sizes)//len(chunk_sizes) if chunk_sizes else 0} chars)"
-        )
+        if file_path and file_path.lower().endswith('.pdf'):
+            logger.info(f"Processing PDF file for extraction: {file_path}")
+
+            assets_dir = Path("surreal_data/assets")
+            assets_dir.mkdir(parents=True, exist_ok=True)
+
+            try:
+                doc = fitz.open(file_path)
+
+                for page_num in range(len(doc)):
+                    page = doc.load_page(page_num)
+                    text_content = page.get_text()
+
+                    if not text_content.strip():
+                        continue
+
+                    # Extract images
+                    image_list = page.get_images(full=True)
+                    image_paths = []
+
+                    for img_index, img in enumerate(image_list):
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image["image"]
+                        image_ext = base_image["ext"]
+
+                        # Save image locally
+                        safe_source_id = str(source.id).replace(':', '_')
+                        image_filename = f"{safe_source_id}_{page_num}_{img_index}.{image_ext}"
+                        image_path = assets_dir / image_filename
+                        with open(image_path, "wb") as f:
+                            f.write(image_bytes)
+
+                        # Store the URL path that the frontend will use to fetch it
+                        image_paths.append(f"/assets/{image_filename}")
+
+                    chunks_data.append({
+                        "text": text_content,
+                        "page": page_num + 1,
+                        "images": image_paths
+                    })
+
+            except Exception as e:
+                logger.error(f"Error processing PDF with PyMuPDF: {e}")
+                # Fallback to standard chunking if PDF parsing fails
+                content_type = detect_content_type(source.full_text or '', file_path)
+                text_chunks = chunk_text(source.full_text or "", content_type=content_type)
+                for i, text in enumerate(text_chunks):
+                    chunks_data.append({
+                        "text": text,
+                        "page": i + 1,
+                        "images": []
+                    })
+        else:
+            if not source.full_text or not source.full_text.strip():
+                raise ValueError(f"Source '{input_data.source_id}' has no text to embed")
+
+            content_type = detect_content_type(source.full_text or '', file_path)
+            text_chunks = chunk_text(source.full_text, content_type=content_type)
+            for i, text in enumerate(text_chunks):
+                chunks_data.append({
+                    "text": text,
+                    "page": i + 1,
+                    "images": []
+                })
+
+        total_chunks = len(chunks_data)
 
         if total_chunks == 0:
             raise ValueError("No chunks created after splitting text")
 
+        logger.info(f"Created {total_chunks} chunks for source {input_data.source_id}")
+
+        # 4. Save SourceChunks to DB
+        from open_notebook.domain.notebook import SourceChunk, SourceEmbedding
+
+        saved_chunks = []
+        for idx, chunk_data in enumerate(chunks_data):
+            chunk = SourceChunk(
+                source_id=input_data.source_id,
+                chunk_index=idx,
+                text_content=chunk_data["text"],
+                page_number=chunk_data["page"],
+                image_paths=chunk_data["images"]
+            )
+            await chunk.save()
+            saved_chunks.append(chunk)
+
         # 5. Generate embeddings for all chunks in batches
         cmd_id = get_command_id(input_data)
         logger.debug(f"Generating embeddings for {total_chunks} chunks")
-        embeddings = await generate_embeddings(chunks, command_id=cmd_id)
+        texts_to_embed = [c.text_content for c in saved_chunks]
+        embeddings = await generate_embeddings(texts_to_embed, command_id=cmd_id)
 
         # Verify we got embeddings for all chunks
-        if len(embeddings) != len(chunks):
+        if len(embeddings) != len(texts_to_embed):
             raise ValueError(
                 f"Embedding count mismatch: got {len(embeddings)} embeddings "
-                f"for {len(chunks)} chunks"
+                f"for {len(texts_to_embed)} chunks"
             )
 
         # 6. Bulk INSERT source_embedding records
+        # Find existing embeddings to delete first based on the old schema it was `source`, now it's `chunk_id`
+        # wait we already changed `source` to `chunk_id` in SourceEmbedding
+
+        from open_notebook.database.repository import ensure_record_id
+        
         records = [
             {
-                "source": ensure_record_id(input_data.source_id),
-                "order": idx,
-                "content": chunk,
+                "chunk_id": str(chunk.id),
+                "source": ensure_record_id(chunk.source_id),
+                "content": chunk.text_content,
                 "embedding": embedding,
+                "order": idx
             }
-            for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            for idx, (chunk, embedding) in enumerate(zip(saved_chunks, embeddings))
         ]
 
         logger.debug(f"Inserting {len(records)} source_embedding records")

@@ -4,7 +4,8 @@ import { Sidebar } from './components/layout/Sidebar';
 import { RightPanel } from './components/layout/RightPanel';
 import { ChatView } from './components/chat/ChatView';
 import { DeployAgentsView } from './components/deploy/DeployAgentsView';
-import { View, RetrievalMode } from './types';
+import { ElyraView } from './components/elyra/ElyraView';
+import { View } from './types';
 
 export default function App() {
   // Navigation State
@@ -18,7 +19,6 @@ export default function App() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   
   // Right Panel / Context State
-  const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>('Hybrid');
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   return (
@@ -32,8 +32,8 @@ export default function App() {
       />
 
       {currentView === 'chat' ? (
-        <>
-          {/* LEFT SIDEBAR (PROJECTS & CHATS) */}
+        <div className="flex flex-1 h-full overflow-hidden relative">
+          {/* LEFT SIDEBAR */}
           <Sidebar 
             isSidebarCollapsed={isSidebarCollapsed}
             activeProjectId={activeProjectId}
@@ -44,26 +44,31 @@ export default function App() {
             setIsRightPanelOpen={setIsRightPanelOpen}
           />
 
-          {/* CENTER - CHAT CANVAS */}
+          {/* CENTER - CHAT CANVAS (includes its own header) */}
           <ChatView 
             isSidebarCollapsed={isSidebarCollapsed}
             setIsSidebarCollapsed={setIsSidebarCollapsed}
             activeProjectId={activeProjectId}
             activeChatId={activeChatId}
+            setActiveChatId={setActiveChatId}
             selectedDocIds={selectedDocIds}
-          />
-
-          {/* RIGHT PANEL - CONTEXT DRAWER */}
-          <RightPanel 
             isRightPanelOpen={isRightPanelOpen}
             setIsRightPanelOpen={setIsRightPanelOpen}
-            activeProjectId={activeProjectId}
-            retrievalMode={retrievalMode}
-            setRetrievalMode={setRetrievalMode}
-            selectedDocIds={selectedDocIds}
-            setSelectedDocIds={setSelectedDocIds}
           />
-        </>
+
+          {/* RIGHT PANEL - only when a project is active */}
+          {activeProjectId && (
+            <RightPanel 
+              isRightPanelOpen={isRightPanelOpen}
+              setIsRightPanelOpen={setIsRightPanelOpen}
+              activeProjectId={activeProjectId}
+              selectedDocIds={selectedDocIds}
+              setSelectedDocIds={setSelectedDocIds}
+            />
+          )}
+        </div>
+      ) : currentView === 'elyra' ? (
+        <ElyraView />
       ) : currentView === 'deploy' ? (
         <DeployAgentsView />
       ) : (

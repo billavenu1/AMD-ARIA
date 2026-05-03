@@ -230,21 +230,29 @@ class ModelManager:
         model_id = None
 
         if model_type == "chat":
-            model_id = defaults.default_chat_model
+            model_id = os.getenv("DEFAULT_CHAT_MODEL") or defaults.default_chat_model
         elif model_type == "transformation":
             model_id = (
-                defaults.default_transformation_model or defaults.default_chat_model
+                os.getenv("DEFAULT_TRANSFORMATION_MODEL")
+                or defaults.default_transformation_model
+                or os.getenv("DEFAULT_CHAT_MODEL")
+                or defaults.default_chat_model
             )
         elif model_type == "tools":
-            model_id = defaults.default_tools_model or defaults.default_chat_model
+            model_id = (
+                os.getenv("DEFAULT_TOOLS_MODEL")
+                or defaults.default_tools_model
+                or os.getenv("DEFAULT_CHAT_MODEL")
+                or defaults.default_chat_model
+            )
         elif model_type == "embedding":
-            model_id = defaults.default_embedding_model
+            model_id = os.getenv("DEFAULT_EMBEDDING_MODEL") or defaults.default_embedding_model
         elif model_type == "text_to_speech":
-            model_id = defaults.default_text_to_speech_model
+            model_id = os.getenv("DEFAULT_TTS_MODEL") or defaults.default_text_to_speech_model
         elif model_type == "speech_to_text":
-            model_id = defaults.default_speech_to_text_model
+            model_id = os.getenv("DEFAULT_STT_MODEL") or defaults.default_speech_to_text_model
         elif model_type == "large_context":
-            model_id = defaults.large_context_model
+            model_id = os.getenv("LARGE_CONTEXT_MODEL") or defaults.large_context_model
 
         if not model_id:
             logger.warning(
@@ -252,6 +260,22 @@ class ModelManager:
                 f"Please go to Settings → Models and set a default model."
             )
             return None
+
+        # Resolve model name to ID if needed (if it doesn't start with 'model:')
+        if model_id and not model_id.startswith("model:"):
+            try:
+                # Look up model by name
+                from open_notebook.database.repository import repo_query
+                models = await repo_query(
+                    "SELECT id FROM model WHERE string::lowercase(name) = $name LIMIT 1",
+                    {"name": model_id.lower()}
+                )
+                if models:
+                    model_id = models[0]["id"]
+                else:
+                    logger.warning(f"Could not resolve model name '{model_id}' from env var to a model ID")
+            except Exception as e:
+                logger.error(f"Error resolving model name '{model_id}': {e}")
 
         try:
             return await self.get_model(model_id, **kwargs)

@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  PanelLeftOpen, 
-  PanelLeftClose, 
   Ghost, 
   Folder, 
   PanelRightOpen, 
-  User, 
   FileText, 
   Search as SearchIcon, 
   Code, 
@@ -16,9 +13,8 @@ import {
   X,
   ChevronDown,
   Settings as SettingsIcon,
-  ToggleRight,
-  ToggleLeft,
   Send,
+  Check,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -77,7 +73,10 @@ interface ChatViewProps {
   setIsSidebarCollapsed: (collapsed: boolean) => void;
   activeProjectId: string | null;
   activeChatId: string | null;
+  setActiveChatId: (id: string | null) => void;
   selectedDocIds: string[];
+  isRightPanelOpen: boolean;
+  setIsRightPanelOpen: (open: boolean) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -85,7 +84,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   setIsSidebarCollapsed,
   activeProjectId,
   activeChatId,
+  setActiveChatId,
   selectedDocIds,
+  isRightPanelOpen,
+  setIsRightPanelOpen,
 }) => {
   const { 
     messages, 
@@ -104,7 +106,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const [input, setInput] = useState('');
   const [isIncognito, setIsIncognito] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>('gemini-3-flash-preview');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
@@ -112,6 +114,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [writingStyle, setWritingStyle] = useState<'Concise' | 'Balanced' | 'Creative'>('Balanced');
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [activeTools, setActiveTools] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (models.length === 0) return;
+    const defaultModel = models.find((model) =>
+      model.id === 'gemini-3-flash-preview' ||
+      model.name.toLowerCase().includes('gemini-3-flash-preview')
+    );
+    if (defaultModel && selectedModel === 'gemini-3-flash-preview') {
+      setSelectedModel(defaultModel.id);
+    }
+  }, [models, selectedModel]);
 
   const handleSend = () => {
     if (!input.trim() || isSending) return;
@@ -142,35 +155,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#0A0A0A] relative">
       {/* Top Header */}
-      <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-between px-4 bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-1.5 text-gray-500 hover:bg-[#1A1A1A] rounded-lg transition-colors"
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-          </button>
-          <div className={`flex items-center gap-2 transition-all ${isSidebarCollapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
-              <div className="w-3 h-3 bg-black rounded-sm"></div>
-            </div>
-            <span className="text-sm font-bold tracking-tight text-white italic">ARIA</span>
-          </div>
-        </div>
+      <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-end px-4 bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-10">
         
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsIncognito(!isIncognito)}
-            className={`p-2 rounded-full transition-all ${isIncognito ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'text-gray-500 hover:text-white hover:bg-[#1A1A1A]'}`}
+            className={`p-2 rounded-xl transition-all ${isIncognito ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'text-gray-500 hover:text-white hover:bg-[#1A1A1A]'}`}
+            title="Incognito Mode"
           >
             <Ghost className="w-5 h-5" />
           </button>
+          
+          {activeProjectId && (
+            <button 
+              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+              className={`p-2 rounded-xl transition-all ${isRightPanelOpen ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'text-gray-500 hover:text-white hover:bg-[#1A1A1A]'}`}
+              title="Toggle Sources"
+            >
+              <PanelRightOpen className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </header>
 
       {/* Chat Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto space-y-12">
+      <div className="flex-1 overflow-y-auto px-4 py-8 custom-scrollbar">
+        <div className="max-w-4xl mx-auto space-y-10">
           {/* Welcome State / Empty State */}
           {!activeChatId && !activeProjectId && messages.length === 0 && (
              <div className="flex flex-col items-center justify-center py-20 text-center space-y-8">
@@ -182,42 +192,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <div className="w-8 h-8 bg-black rounded-lg"></div>
               </motion.div>
               <div className="space-y-3">
-                <h2 className="text-3xl font-bold tracking-tight text-white italic">How can I help you today?</h2>
-                <p className="text-gray-500 max-w-sm mx-auto text-sm">Select a project or start a new chat to begin your session.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 w-full max-w-md mt-4">
-                {[
-                  { icon: FileText, label: 'Summarize a document', color: 'text-blue-400' },
-                  { icon: SearchIcon, label: 'Analyze data trends', color: 'text-emerald-400' },
-                  { icon: Code, label: 'Compare reports', color: 'text-purple-400' },
-                  { icon: Globe, label: 'Generate Insights', color: 'text-amber-400' },
-                ].map((action, i) => (
-                  <button key={i} className="flex items-center gap-3 p-4 bg-[#131313] border border-[#1F1F1F] rounded-2xl hover:bg-[#1A1A1A] hover:border-[#333] transition-all text-xs font-medium text-gray-300 group">
-                    <action.icon className={`w-4 h-4 ${action.color} group-hover:scale-110 transition-transform`} />
-                    <span>{action.label}</span>
-                  </button>
-                ))}
+                <h2 className="text-2xl font-bold tracking-tight text-white italic">How can I help you today?</h2>
+                <p className="text-gray-500 max-w-sm mx-auto text-xs">Select a project or start a new chat to begin your session.</p>
               </div>
             </div>
           )}
 
-          {activeProjectId && (
-            <div className="flex flex-col gap-8">
+          {activeProjectId && messages.length === 0 && (
+            <div className="flex flex-col gap-8 mb-12">
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-[#131313] border border-[#1F1F1F] p-5 rounded-2xl flex items-center justify-between"
+                className="bg-[#111] border border-[#1F1F1F] p-6 rounded-2xl flex items-center justify-between shadow-xl"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm border border-[#333]">
-                    <Folder className="w-5 h-5 text-[#8B5CF6]" />
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm border border-[#333]">
+                    <Folder className="w-6 h-6 text-[#8B5CF6]" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-sm">Project: {project?.name || 'Loading...'}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-[#1A1A1A] px-2 py-0.5 rounded border border-[#333]">
+                    <h3 className="font-bold text-white text-base">Project: {project?.name || 'Loading...'}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 bg-[#1A1A1A] px-2 py-0.5 rounded border border-[#333] font-bold uppercase tracking-wider">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        {project?.source_count || 0} SOURCES
+                        {project?.source_count || 0} SOURCES ACTIVE
                       </div>
                     </div>
                   </div>
@@ -227,44 +224,43 @@ export const ChatView: React.FC<ChatViewProps> = ({
           )}
 
           {/* Messages Thread */}
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-10">
             {messages.map((msg, i) => (
-              <div key={msg.id || i} className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
+              <div 
+                key={msg.id || i} 
+                className={`flex flex-col gap-3 ${msg.type === 'human' ? 'items-end' : 'items-center'}`}
+              >
+                {/* Message Content */}
+                <div 
+                  className={`
+                    ${msg.type === 'human' 
+                      ? 'max-w-[80%] bg-[#1A1A1A] text-[14px] text-gray-200 leading-relaxed whitespace-pre-wrap p-4 rounded-2xl border border-[#333]/50 shadow-lg' 
+                      : 'w-full space-y-6'
+                    }
+                  `}
+                >
                   {msg.type === 'human' ? (
-                    <>
-                      <User className="w-4 h-4" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">User</span>
-                    </>
+                    msg.content
                   ) : (
-                    <>
-                      <div className="w-4 h-4 rounded-sm bg-[#8B5CF6] flex items-center justify-center shadow-[0_0_12px_rgba(139,92,246,0.3)]">
-                        <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+                    <div className="max-w-3xl mx-auto text-left">
+                      <div className="bg-[#111]/50 p-1 rounded-3xl">
+                        <AIMessageContent 
+                          content={msg.content} 
+                          onReferenceClick={(type, id) => console.log('Ref click', type, id)}
+                        />
                       </div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest italic">ARIA</span>
-                    </>
+                    </div>
                   )}
-                </div>
-                <div className={`max-w-3xl ${msg.type === 'human' ? 'text-lg text-gray-100 leading-relaxed whitespace-pre-wrap' : 'bg-[#131313] border border-[#1F1F1F] rounded-2xl p-6 space-y-4 shadow-xl'}`}>
-                  {msg.type === 'human' 
-                    ? msg.content 
-                    : <AIMessageContent 
-                        content={msg.content} 
-                        onReferenceClick={(type, id) => {
-                          console.log(`Clicked reference: ${type}:${id}`);
-                          alert(`Reference Clicked!\nType: ${type}\nID: ${id}\n\n(In the full app, this will open the source document)`);
-                        }} 
-                      />
-                  }
                 </div>
               </div>
             ))}
+
             {isSending && (
-              <div className="flex items-center gap-2 text-[#8B5CF6] animate-pulse">
-                <div className="w-4 h-4 rounded-sm bg-[#8B5CF6] flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest italic">ARIA is thinking...</span>
+              <div className="flex items-center gap-3 justify-center pt-4">
+                 <div className="w-5 h-5 rounded-md bg-[#8B5CF6] flex items-center justify-center animate-pulse">
+                    <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+                 </div>
+                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest animate-pulse">ARIA is thinking...</span>
               </div>
             )}
           </div>
@@ -373,7 +369,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   >
                     <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      {models.find(m => m.id === selectedModel)?.name || 'Select Model'}
+                      {models.find(m => m.id === selectedModel)?.name || selectedModel || 'Select Model'}
                     </span>
                     <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showModelMenu ? 'rotate-180' : ''}`} />
                   </button>

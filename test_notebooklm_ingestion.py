@@ -21,7 +21,7 @@ async def test_pdf_ingestion(pdf_path: str, db_url: str = "ws://localhost:8000/r
     
     # Setup SurrealDB connection
     db = Surreal(db_url)
-    await db.connect()
+    # await db.connect()
     await db.signin({"user": "root", "pass": "root"})
     await db.use("test", "test")
     
@@ -96,7 +96,7 @@ async def test_pdf_ingestion(pdf_path: str, db_url: str = "ws://localhost:8000/r
 
 if __name__ == "__main__":
     # Point this to the sample PDF
-    sample_pdf_dir = Path("c:/Users/venub/Desktop/Projects/AMD hackathon/ARIA/sample-pdf")
+    sample_pdf_dir = Path("sample-pdf")
     
     # Find a PDF in the directory
     pdf_files = list(sample_pdf_dir.glob("*.pdf"))

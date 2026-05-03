@@ -7,26 +7,26 @@ export function useChatSessions(notebookId?: string | null) {
   return useQuery<ChatSession[]>({
     queryKey: ['chat-sessions', notebookId],
     queryFn: async () => {
-      if (!notebookId) return []; // Only fetch if notebookId is provided
-      const response = await api.get(`/chat/sessions?notebook_id=${notebookId}`);
+      const url = notebookId ? `/chat/sessions?notebook_id=${notebookId}` : '/chat/sessions';
+      const response = await api.get(url);
       return response.data;
     },
-    enabled: !!notebookId,
+    // No longer dependent on notebookId existence
   });
 }
 
 export function useCreateSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ notebookId, title }: { notebookId: string; title?: string }) => {
+    mutationFn: async ({ notebookId, title }: { notebookId?: string | null; title?: string }) => {
       const response = await api.post('/chat/sessions', {
         notebook_id: notebookId,
         title: title || 'New Chat',
       });
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chat-sessions', variables.notebookId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
     },
   });
 }
@@ -39,7 +39,7 @@ export function useUpdateSession() {
       return response.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['chat-sessions', data.notebook_id] });
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['chat-session', data.id] });
     },
   });
@@ -92,7 +92,7 @@ export function useChat(notebookId: string | null) {
       return response.data;
     },
     onSuccess: (newSession) => {
-      queryClient.invalidateQueries({ queryKey: ['chat-sessions', notebookId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
       setCurrentSessionId(newSession.id);
     },
   });

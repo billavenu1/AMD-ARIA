@@ -5,7 +5,6 @@ import {
   FileText, 
   ToggleRight, 
   ToggleLeft, 
-  ChevronDown, 
   AudioLines, 
   Network,
   Plus,
@@ -20,14 +19,13 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useSources, useUploadSource, useUploadMultipleSources, useAddLinkSource, useDeleteSource } from '../../hooks/useSources';
-import { RetrievalMode, Source } from '../../types';
+import { Source } from '../../types';
+import { AudioOverviewModal } from '../podcast/AudioOverviewModal';
 
 interface RightPanelProps {
   isRightPanelOpen: boolean;
   setIsRightPanelOpen: (open: boolean) => void;
   activeProjectId: string | null;
-  retrievalMode: RetrievalMode;
-  setRetrievalMode: (mode: RetrievalMode) => void;
   selectedDocIds: string[];
   setSelectedDocIds: React.Dispatch<React.SetStateAction<string[]>>;
 }
@@ -54,8 +52,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   isRightPanelOpen,
   setIsRightPanelOpen,
   activeProjectId,
-  retrievalMode,
-  setRetrievalMode,
   selectedDocIds,
   setSelectedDocIds,
 }) => {
@@ -66,6 +62,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const deleteMutation = useDeleteSource(activeProjectId);
 
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
@@ -323,26 +320,12 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
             {/* Bottom actions */}
             <div className="space-y-4 mt-auto">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest pl-1">Retrieval Mode</span>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                    <ChevronDown className="w-3 h-3 text-gray-600" />
-                  </div>
-                  <select 
-                    value={retrievalMode}
-                    onChange={(e) => setRetrievalMode(e.target.value as RetrievalMode)}
-                    className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl px-3 py-2 text-[10px] font-bold text-gray-300 appearance-none focus:outline-none focus:ring-1 focus:ring-[#8B5CF6] transition-all cursor-pointer"
-                  >
-                    <option value="Notebook">Notebook Search</option>
-                    <option value="Hybrid">Hybrid Search</option>
-                    <option value="Vector">Vector Search</option>
-                  </select>
-                </div>
-              </div>
 
               <div className="flex flex-col gap-2">
-                <button className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-[#131313] border border-[#1F1F1F] hover:bg-[#1A1A1A] hover:border-[#333] transition-all text-center group">
+                <button 
+                  onClick={() => setIsAudioModalOpen(true)}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-[#131313] border border-[#1F1F1F] hover:bg-[#1A1A1A] hover:border-[#333] transition-all text-center group"
+                >
                   <AudioLines className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tighter">Audio Overview</span>
                 </button>
@@ -357,6 +340,14 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               </div>
             </div>
           </div>
+
+          <AudioOverviewModal 
+            isOpen={isAudioModalOpen} 
+            onClose={() => setIsAudioModalOpen(false)}
+            selectedDocIds={selectedDocIds}
+            activeProjectId={activeProjectId}
+            sources={sources}
+          />
         </motion.aside>
       )}
     </AnimatePresence>

@@ -354,6 +354,7 @@ class SourceListResponse(BaseModel):
     title: Optional[str]
     topics: Optional[List[str]]
     asset: Optional[AssetModel]
+    full_text: Optional[str] = None
     embedded: bool  # Boolean flag indicating if source has embeddings
     embedded_chunks: int  # Number of embedded chunks
     insights_count: int
